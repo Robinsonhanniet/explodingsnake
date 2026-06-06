@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snake</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --grid: rgba(255,255,255,0.03);
+    --snake-head: #00ff88;
+    --snake-body: #00cc66;
+    --accent: #00ff88;
+    --accent2: #ff3366;
+    --text: #e0ffe8;
+    --muted: rgba(224,255,232,0.4);
+    --panel: rgba(0,255,136,0.06);
+    --border: rgba(0,255,136,0.15);
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 50% 0%, rgba(0,255,136,0.07) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 60% at 100% 100%, rgba(255,51,102,0.05) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #app {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  header {
+    text-align: center;
+  }
+
+  header h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-shadow: 0 0 30px rgba(0,255,136,0.4);
+  }
+
+  #hud {
+    display: flex;
+    gap: 32px;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  #hud .val {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    display: block;
+    text-align: center;
+    margin-top: 2px;
+    font-family: 'Orbitron', monospace;
+  }
+
+  #arena {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    background: #080810;
+    box-shadow:
+      0 0 0 1px rgba(0,255,136,0.05),
+      0 0 60px rgba(0,255,136,0.06),
+      inset 0 0 60px rgba(0,0,0,0.5);
+  }
+
+  canvas { display: block; }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: rgba(8,8,16,0.88);
+    backdrop-filter: blur(4px);
+    transition: opacity 0.3s;
+  }
+
+  #overlay h2 {
+    font-family: 'Orbitron', monospace;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-shadow: 0 0 20px rgba(0,255,136,0.5);
+  }
+
+  #overlay p {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-align: center;
+    line-height: 1.8;
+  }
+
+  #overlay .final-score {
+    font-family: 'Orbitron', monospace;
+    font-size: 36px;
+    color: var(--accent2);
+    text-shadow: 0 0 20px rgba(255,51,102,0.5);
+  }
+
+  #btn {
+    margin-top: 8px;
+    padding: 10px 32px;
+    background: transparent;
+    border: 1px solid var(--accent);
+    border-radius: 2px;
+    color: var(--accent);
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background 0.15s, box-shadow 0.15s;
+  }
+
+  #btn:hover {
+    background: rgba(0,255,136,0.1);
+    box-shadow: 0 0 20px rgba(0,255,136,0.2);
+  }
+
+  #hint {
+    font-size: 11px;
+    color: rgba(224,255,232,0.2);
+    letter-spacing: 0.12em;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  #hint kbd {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>SNAKE</h1>
+  </header>
+
+  <div id="hud">
+    <div>Score<span class="val" id="score">0</span></div>
+    <div>Length<span class="val" id="length">3</span></div>
+    <div>Apples<span class="val" id="apples">0</span></div>
+  </div>
+
+  <div id="arena">
+    <canvas id="c"></canvas>
+    <div id="overlay">
+      <h2 id="ov-title">SNAKE</h2>
+      <p id="ov-msg">Arrow keys to move<br>Click an apple to explode it</p>
+      <div class="final-score" id="ov-score" style="display:none"></div>
+      <button id="btn">START</button>
+    </div>
+  </div>
+
+  <div id="hint">
+    <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd>
+    <span>move · click apple to blast it</span>
+  </div>
+</div>
+
+<script>
+const COLS = 25, ROWS = 25, CELL = 20;
+const W = COLS * CELL, H = ROWS * CELL;
+
+const APPLE_COLORS = [
+  '#FF4444','#FF7700','#FFD700','#44DD44',
+  '#44AAFF','#CC44FF','#FF44AA','#00DDCC','#FF6644'
+];
+
+const canvas = document.getElementById('c');
+canvas.width = W; canvas.height = H;
+const ctx = canvas.getContext('2d');
+
+const overlay = document.getElementById('overlay');
+const btn = document.getElementById('btn');
+const ovTitle = document.getElementById('ov-title');
+const ovMsg = document.getElementById('ov-msg');
+const ovScore = document.getElementById('ov-score');
+
+document.getElementById('arena').style.width  = W + 'px';
+document.getElementById('arena').style.height = H + 'px';
+
+let snake, dir, nextDir, apples, particles, score, alive, raf, appleTimer, tick;
+
+function rnd(n) { return Math.floor(Math.random() * n); }
+function randColor() { return APPLE_COLORS[rnd(APPLE_COLORS.length)]; }
+function randPos() { return { x: rnd(COLS), y: rnd(ROWS) }; }
+function onSnake(p) { return snake.some(s => s.x === p.x && s.y === p.y); }
+function onApple(p) { return apples.some(a => a.x === p.x && a.y === p.y); }
+function freePos() {
+  let p, tries = 0;
+  do { p = randPos(); tries++; } while ((onSnake(p) || onApple(p)) && tries < 200);
+  return p;
+}
+
+function spawnApple() {
+  if (apples.length >= 8) return;
+  const p = freePos();
+  p.color = randColor();
+  p.age = rnd(60);
+  apples.push(p);
+  document.getElementById('apples').textContent = apples.length;
+}
+
+function explode(ap, big) {
+  const cx = ap.x * CELL + CELL / 2, cy = ap.y * CELL + CELL / 2;
+  const count = big ? 32 : 18;
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = big ? (2 + Math.random() * 4) : (1.2 + Math.random() * 2.5);
+    particles.push({
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1,
+      color: ap.color,
+      size: big ? (3 + Math.random() * 4) : (2 + Math.random() * 3)
+    });
+  }
+  if (big) {
+    particles.push({
+      x: cx, y: cy, vx: 0, vy: 0,
+      life: 1, color: ap.color, size: CELL * 1.2, ring: true
+    });
+  }
+  apples = apples.filter(a => a !== ap);
+  document.getElementById('apples').textContent = apples.length;
+}
+
+function init() {
+  const mx = Math.floor(COLS / 2);
+  const my = Math.floor(ROWS / 2);
+  snake = [{ x: mx, y: my }, { x: mx - 1, y: my }, { x: mx - 2, y: my }];
+  dir = { x: 1, y: 0 }; nextDir = { x: 1, y: 0 };
+  apples = []; particles = []; score = 0; alive = true; tick = 0;
+  document.getElementById('score').textContent = 0;
+  document.getElementById('length').textContent = snake.length;
+  document.getElementById('apples').textContent = 0;
+  spawnApple(); spawnApple();
+  clearInterval(appleTimer);
+  appleTimer = setInterval(() => { if (alive) spawnApple(); }, 2000);
+}
+
+function step() {
+  if (!alive) return;
+  dir = { ...nextDir };
+  const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+  if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
+    gameOver(); return;
+  }
+  if (onSnake(head)) { gameOver(); return; }
+
+  snake.unshift(head);
+  const eaten = apples.find(a => a.x === head.x && a.y === head.y);
+  if (eaten) {
+    score += 10;
+    document.getElementById('score').textContent = score;
+    explode(eaten, false);
+  } else {
+    snake.pop();
+  }
+  document.getElementById('length').textContent = snake.length;
+}
+
+function gameOver() {
+  alive = false;
+  clearInterval(appleTimer);
+  setTimeout(() => {
+    ovTitle.textContent = 'GAME OVER';
+    ovMsg.textContent = 'Final score';
+    ovScore.textContent = score;
+    ovScore.style.display = 'block';
+    btn.textContent = 'PLAY AGAIN';
+    overlay.style.display = 'flex';
+  }, 350);
+}
+
+function drawGrid() {
+  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= COLS; i++) {
+    ctx.beginPath(); ctx.moveTo(i * CELL, 0); ctx.lineTo(i * CELL, H); ctx.stroke();
+  }
+  for (let j = 0; j <= ROWS; j++) {
+    ctx.beginPath(); ctx.moveTo(0, j * CELL); ctx.lineTo(W, j * CELL); ctx.stroke();
+  }
+}
+
+function drawApples() {
+  apples.forEach(a => {
+    a.age++;
+    const pulse = 0.86 + Math.sin(a.age * 0.1) * 0.14;
+    const cx = a.x * CELL + CELL / 2, cy = a.y * CELL + CELL / 2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(pulse, pulse);
+
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = a.color;
+    ctx.fillStyle = a.color;
+    ctx.beginPath();
+    ctx.arc(0, 0, CELL * 0.38, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.beginPath();
+    ctx.arc(-2.5, -3, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  });
+}
+
+function drawSnake() {
+  snake.forEach((s, i) => {
+    const ratio = i / snake.length;
+    const green = Math.round(255 - ratio * 80);
+    const alpha = 1 - ratio * 0.25;
+    ctx.fillStyle = i === 0 ? '#00ff88' : `rgba(0,${green},${Math.round(green * 0.5)},${alpha})`;
+
+    ctx.shadowBlur = i === 0 ? 16 : 6;
+    ctx.shadowColor = i === 0 ? '#00ff88' : '#00cc66';
+
+    const r = i === 0 ? CELL * 0.46 : CELL * 0.38;
+    const rr = i === 0 ? 5 : 3;
+    const x = s.x * CELL + CELL / 2 - r, y = s.y * CELL + CELL / 2 - r;
+    ctx.beginPath();
+    ctx.roundRect(x, y, r * 2, r * 2, rr);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    if (i === 0) {
+      const ex = dir.x * 4.5, ey = dir.y * 4.5;
+      ctx.fillStyle = '#fff';
+      ctx.shadowBlur = 4; ctx.shadowColor = '#fff';
+      ctx.beginPath();
+      ctx.arc(s.x * CELL + CELL / 2 + ex + ey * 0.5, s.y * CELL + CELL / 2 + ey - ex * 0.5, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(s.x * CELL + CELL / 2 + ex - ey * 0.5, s.y * CELL + CELL / 2 + ey + ex * 0.5, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  });
+}
+
+function drawParticles() {
+  particles = particles.filter(p => {
+    if (p.ring) {
+      p.life -= 0.04;
+      if (p.life <= 0) return false;
+      ctx.globalAlpha = p.life * 0.6;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * (1.5 - p.life), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      return true;
+    }
+    p.x += p.vx; p.y += p.vy;
+    p.vx *= 0.91; p.vy *= 0.91;
+    p.life -= 0.022;
+    if (p.life <= 0) return false;
+    ctx.globalAlpha = p.life;
+    ctx.shadowBlur = 6; ctx.shadowColor = p.color;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+    return true;
+  });
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#080810';
+  ctx.fillRect(0, 0, W, H);
+  drawGrid();
+  drawApples();
+  drawSnake();
+  drawParticles();
+}
+
+let lastTick = 0;
+const SPEED = 145;
+
+function loop(ts) {
+  raf = requestAnimationFrame(loop);
+  draw();
+  if (alive && ts - lastTick > SPEED) {
+    step(); lastTick = ts;
+  }
+}
+
+btn.addEventListener('click', () => {
+  init();
+  ovScore.style.display = 'none';
+  overlay.style.display = 'none';
+  cancelAnimationFrame(raf);
+  lastTick = 0;
+  raf = requestAnimationFrame(loop);
+});
+
+canvas.addEventListener('click', e => {
+  if (!alive) return;
+  const rect = canvas.getBoundingClientRect();
+  const sx = W / rect.width, sy = H / rect.height;
+  const mx = (e.clientX - rect.left) * sx;
+  const my = (e.clientY - rect.top) * sy;
+  const gx = Math.floor(mx / CELL), gy = Math.floor(my / CELL);
+  const ap = apples.find(a => a.x === gx && a.y === gy);
+  if (ap) {
+    explode(ap, true);
+    score += 5;
+    document.getElementById('score').textContent = score;
+    setTimeout(() => { if (alive) spawnApple(); }, 600);
+  }
+});
+
+document.addEventListener('keydown', e => {
+  const map = {
+    ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
+    ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 }
+  };
+  const d = map[e.key];
+  if (d && !(d.x === -dir.x && d.y === -dir.y)) {
+    nextDir = d;
+    e.preventDefault();
+  }
+});
+</script>
+</body>
+</html>
