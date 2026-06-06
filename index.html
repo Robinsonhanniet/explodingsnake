@@ -481,3 +481,539 @@ document.addEventListener('keydown', e => {
 </script>
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snake 2 Players</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #08080f;
+    --s1: #00ff88;
+    --s2: #ff3366;
+    --accent: #ffffff;
+    --muted: rgba(255,255,255,0.35);
+    --border: rgba(255,255,255,0.08);
+  }
+
+  html, body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: #fff;
+    font-family: 'Share Tech Mono', monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 50% 40% at 20% 50%, rgba(0,255,136,0.06) 0%, transparent 65%),
+      radial-gradient(ellipse 50% 40% at 80% 50%, rgba(255,51,102,0.06) 0%, transparent 65%);
+    pointer-events: none;
+  }
+
+  #app {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    background: linear-gradient(90deg, var(--s1), #fff 40%, #fff 60%, var(--s2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  #hud {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    width: 500px;
+    align-items: center;
+    gap: 0;
+  }
+
+  .p-hud {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .p-hud.p1 { align-items: flex-start; color: var(--s1); }
+  .p-hud.p2 { align-items: flex-end; color: var(--s2); }
+
+  .p-hud .name {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .p-hud .score-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 22px;
+    font-weight: 700;
+  }
+  .p-hud .info { color: var(--muted); font-size: 10px; }
+
+  #vs {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    color: var(--muted);
+    text-align: center;
+    letter-spacing: 0.1em;
+  }
+
+  #arena {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    background: #06060d;
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.03),
+      0 0 80px rgba(0,0,0,0.8),
+      inset 0 0 40px rgba(0,0,0,0.6);
+  }
+
+  canvas { display: block; }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: rgba(6,6,13,0.9);
+    backdrop-filter: blur(6px);
+  }
+
+  #overlay h2 {
+    font-family: 'Orbitron', monospace;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: #fff;
+  }
+
+  #overlay .winner {
+    font-family: 'Orbitron', monospace;
+    font-size: 40px;
+    font-weight: 700;
+  }
+  #overlay .winner.p1 { color: var(--s1); text-shadow: 0 0 30px rgba(0,255,136,0.5); }
+  #overlay .winner.p2 { color: var(--s2); text-shadow: 0 0 30px rgba(255,51,102,0.5); }
+  #overlay .winner.draw { color: #fff; text-shadow: 0 0 20px rgba(255,255,255,0.3); }
+
+  #overlay p {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 2;
+    letter-spacing: 0.1em;
+  }
+
+  #btn {
+    margin-top: 6px;
+    padding: 10px 36px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 2px;
+    color: #fff;
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  #btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.5); }
+
+  #controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 500px;
+    font-size: 10px;
+    color: rgba(255,255,255,0.18);
+    letter-spacing: 0.1em;
+  }
+  .ctrl-p1 { color: rgba(0,255,136,0.35); }
+  .ctrl-p2 { color: rgba(255,51,102,0.35); text-align: right; }
+
+  kbd {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>SNAKE × 2</h1>
+
+  <div id="hud">
+    <div class="p-hud p1">
+      <span class="name">PLAYER 1</span>
+      <span class="score-val" id="s1">0</span>
+      <span class="info">WASD · <span id="l1">3</span> segments</span>
+    </div>
+    <div id="vs">VS</div>
+    <div class="p-hud p2">
+      <span class="name">PLAYER 2</span>
+      <span class="score-val" id="s2">0</span>
+      <span class="info"><span id="l2">3</span> segments · ARROWS</span>
+    </div>
+  </div>
+
+  <div id="arena">
+    <canvas id="c"></canvas>
+    <div id="overlay">
+      <h2 id="ov-title">SNAKE × 2</h2>
+      <div class="winner draw" id="ov-winner" style="display:none"></div>
+      <p id="ov-msg">
+        Player 1 — <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><br>
+        Player 2 — <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd><br>
+        Click an apple to explode it
+      </p>
+      <button id="btn">START</button>
+    </div>
+  </div>
+
+  <div id="controls">
+    <div class="ctrl-p1"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> — Player 1 · click apple to blast</div>
+    <div class="ctrl-p2">Player 2 — <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></div>
+  </div>
+</div>
+
+<script>
+const COLS = 25, ROWS = 25, CELL = 20;
+const W = COLS * CELL, H = ROWS * CELL;
+
+const APPLE_COLORS = ['#FF4444','#FF8800','#FFD700','#44EE44','#44AAFF','#CC44FF','#FF44AA','#00DDCC','#FF6644'];
+
+const canvas = document.getElementById('c');
+canvas.width = W; canvas.height = H;
+const ctx = canvas.getContext('2d');
+document.getElementById('arena').style.width  = W + 'px';
+document.getElementById('arena').style.height = H + 'px';
+
+const overlay   = document.getElementById('overlay');
+const btn       = document.getElementById('btn');
+const ovTitle   = document.getElementById('ov-title');
+const ovMsg     = document.getElementById('ov-msg');
+const ovWinner  = document.getElementById('ov-winner');
+
+// ── state ──────────────────────────────────────────────────────────────
+let snakes, apples, particles, alive, raf, appleTimer, lastTick;
+const SPEED = 145;
+
+const PLAYERS = [
+  {
+    color: '#00ff88', bodyColor: (i,n) => {
+      const g = Math.round(255 - (i/n)*80);
+      return `rgba(0,${g},${Math.round(g*0.5)},${1-(i/n)*0.25})`;
+    },
+    shadow: '#00ff88',
+    startX: Math.floor(COLS*0.25), startY: Math.floor(ROWS/2),
+    startDir: {x:1,y:0},
+    scoreEl: document.getElementById('s1'),
+    lenEl: document.getElementById('l1'),
+  },
+  {
+    color: '#ff3366', bodyColor: (i,n) => {
+      const r = Math.round(255 - (i/n)*80);
+      return `rgba(${r},${Math.round(r*0.1)},${Math.round(r*0.35)},${1-(i/n)*0.25})`;
+    },
+    shadow: '#ff3366',
+    startX: Math.floor(COLS*0.75), startY: Math.floor(ROWS/2),
+    startDir: {x:-1,y:0},
+    scoreEl: document.getElementById('s2'),
+    lenEl: document.getElementById('l2'),
+  }
+];
+
+function rnd(n){ return Math.floor(Math.random()*n); }
+function randColor(){ return APPLE_COLORS[rnd(APPLE_COLORS.length)]; }
+function randPos(){ return {x:rnd(COLS),y:rnd(ROWS)}; }
+function onAnySnake(p){
+  return snakes.some(sn=>sn.body.some(s=>s.x===p.x&&s.y===p.y));
+}
+function onApple(p){ return apples.some(a=>a.x===p.x&&a.y===p.y); }
+function freePos(){
+  let p, tries=0;
+  do{ p=randPos(); tries++; }while((onAnySnake(p)||onApple(p))&&tries<300);
+  return p;
+}
+
+function spawnApple(){
+  if(apples.length>=8) return;
+  const p=freePos();
+  p.color=randColor(); p.age=rnd(60);
+  apples.push(p);
+}
+
+function explode(ap, big){
+  const cx=ap.x*CELL+CELL/2, cy=ap.y*CELL+CELL/2;
+  const count=big?32:16;
+  for(let i=0;i<count;i++){
+    const angle=Math.random()*Math.PI*2;
+    const speed=big?(2+Math.random()*4):(1.2+Math.random()*2.5);
+    particles.push({
+      x:cx,y:cy,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,
+      life:1,color:ap.color,size:big?(3+Math.random()*4):(2+Math.random()*3)
+    });
+  }
+  if(big) particles.push({x:cx,y:cy,vx:0,vy:0,life:1,color:ap.color,size:CELL*1.2,ring:true});
+  apples=apples.filter(a=>a!==ap);
+}
+
+function makeSnake(p){
+  const body=[];
+  for(let i=0;i<3;i++) body.push({x:p.startX-i*p.startDir.x, y:p.startY});
+  return {
+    body,
+    dir:{...p.startDir},
+    nextDir:{...p.startDir},
+    score:0,
+    dead:false,
+    cfg:p
+  };
+}
+
+function init(){
+  snakes = PLAYERS.map(p=>makeSnake(p));
+  apples=[]; particles=[]; alive=true;
+  PLAYERS.forEach(p=>{ p.scoreEl.textContent=0; p.lenEl.textContent=3; });
+  spawnApple(); spawnApple();
+  clearInterval(appleTimer);
+  appleTimer=setInterval(()=>{ if(alive) spawnApple(); },2000);
+}
+
+function step(){
+  if(!alive) return;
+
+  // move both snakes
+  snakes.forEach(sn=>{
+    if(sn.dead) return;
+    sn.dir={...sn.nextDir};
+    const head={x:sn.body[0].x+sn.dir.x, y:sn.body[0].y+sn.dir.y};
+
+    // wall collision
+    if(head.x<0||head.x>=COLS||head.y<0||head.y>=ROWS){
+      sn.dead=true; return;
+    }
+    // self collision (skip head)
+    if(sn.body.slice(1).some(s=>s.x===head.x&&s.y===head.y)){
+      sn.dead=true; return;
+    }
+    sn.body.unshift(head);
+
+    const eaten=apples.find(a=>a.x===head.x&&a.y===head.y);
+    if(eaten){
+      sn.score+=10;
+      sn.cfg.scoreEl.textContent=sn.score;
+      explode(eaten,false);
+    } else {
+      sn.body.pop();
+    }
+    sn.cfg.lenEl.textContent=sn.body.length;
+  });
+
+  // cross-collision (after both moved)
+  snakes.forEach((sn,i)=>{
+    if(sn.dead) return;
+    const other=snakes[1-i];
+    const head=sn.body[0];
+    if(other.body.some(s=>s.x===head.x&&s.y===head.y)) sn.dead=true;
+  });
+
+  const deadCount=snakes.filter(s=>s.dead).length;
+  if(deadCount>0){
+    alive=false;
+    clearInterval(appleTimer);
+    setTimeout(showResult,400);
+  }
+}
+
+function showResult(){
+  ovTitle.textContent='GAME OVER';
+  const [a,b]=snakes;
+  if(a.dead&&b.dead){
+    ovWinner.textContent='DRAW';
+    ovWinner.className='winner draw';
+  } else if(a.dead){
+    ovWinner.textContent='P2 WINS!';
+    ovWinner.className='winner p2';
+  } else {
+    ovWinner.textContent='P1 WINS!';
+    ovWinner.className='winner p1';
+  }
+  ovWinner.style.display='block';
+  ovMsg.textContent=`P1: ${snakes[0].score}pts  ·  P2: ${snakes[1].score}pts`;
+  btn.textContent='PLAY AGAIN';
+  overlay.style.display='flex';
+}
+
+// ── drawing ─────────────────────────────────────────────────────────────
+function drawGrid(){
+  ctx.strokeStyle='rgba(255,255,255,0.022)';
+  ctx.lineWidth=0.5;
+  for(let i=0;i<=COLS;i++){
+    ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,H);ctx.stroke();
+  }
+  for(let j=0;j<=ROWS;j++){
+    ctx.beginPath();ctx.moveTo(0,j*CELL);ctx.lineTo(W,j*CELL);ctx.stroke();
+  }
+}
+
+function drawApples(){
+  apples.forEach(a=>{
+    a.age++;
+    const pulse=0.86+Math.sin(a.age*0.1)*0.14;
+    const cx=a.x*CELL+CELL/2, cy=a.y*CELL+CELL/2;
+    ctx.save();
+    ctx.translate(cx,cy);ctx.scale(pulse,pulse);
+    ctx.shadowBlur=14;ctx.shadowColor=a.color;
+    ctx.fillStyle=a.color;
+    ctx.beginPath();ctx.arc(0,0,CELL*0.38,0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(255,255,255,0.28)';
+    ctx.beginPath();ctx.arc(-2.5,-3,3,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawOneSnake(sn){
+  const cfg=sn.cfg;
+  const n=sn.body.length;
+  sn.body.forEach((s,i)=>{
+    ctx.fillStyle=i===0 ? cfg.color : cfg.bodyColor(i,n);
+    ctx.shadowBlur=i===0?16:5;
+    ctx.shadowColor=cfg.shadow;
+    const r=i===0?CELL*0.46:CELL*0.38;
+    const rr=i===0?5:3;
+    ctx.beginPath();
+    ctx.roundRect(s.x*CELL+CELL/2-r,s.y*CELL+CELL/2-r,r*2,r*2,rr);
+    ctx.fill();
+    ctx.shadowBlur=0;
+
+    if(i===0){
+      const ex=sn.dir.x*4.5,ey=sn.dir.y*4.5;
+      ctx.fillStyle='#fff';ctx.shadowBlur=4;ctx.shadowColor='#fff';
+      ctx.beginPath();
+      ctx.arc(s.x*CELL+CELL/2+ex+ey*0.5,s.y*CELL+CELL/2+ey-ex*0.5,2.2,0,Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(s.x*CELL+CELL/2+ex-ey*0.5,s.y*CELL+CELL/2+ey+ex*0.5,2.2,0,Math.PI*2);
+      ctx.fill();
+      ctx.shadowBlur=0;
+    }
+  });
+
+  if(sn.dead){
+    ctx.globalAlpha=0.35;
+    ctx.fillStyle=cfg.color;
+    sn.body.forEach(s=>{
+      ctx.fillRect(s.x*CELL+2,s.y*CELL+2,CELL-4,CELL-4);
+    });
+    ctx.globalAlpha=1;
+  }
+}
+
+function drawParticles(){
+  particles=particles.filter(p=>{
+    if(p.ring){
+      p.life-=0.04;
+      if(p.life<=0) return false;
+      ctx.globalAlpha=p.life*0.6;
+      ctx.strokeStyle=p.color;ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(p.x,p.y,p.size*(1.5-p.life),0,Math.PI*2);ctx.stroke();
+      ctx.globalAlpha=1;return true;
+    }
+    p.x+=p.vx;p.y+=p.vy;p.vx*=0.91;p.vy*=0.91;p.life-=0.022;
+    if(p.life<=0) return false;
+    ctx.globalAlpha=p.life;
+    ctx.shadowBlur=6;ctx.shadowColor=p.color;
+    ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size*p.life,0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=0;ctx.globalAlpha=1;return true;
+  });
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#06060d';
+  ctx.fillRect(0,0,W,H);
+  drawGrid();
+  drawApples();
+  snakes.forEach(drawOneSnake);
+  drawParticles();
+}
+
+function loop(ts){
+  raf=requestAnimationFrame(loop);
+  draw();
+  if(alive&&ts-lastTick>SPEED){ step();lastTick=ts; }
+}
+
+// ── controls ─────────────────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  const sn0=snakes&&snakes[0], sn1=snakes&&snakes[1];
+  if(!sn0||!sn1) return;
+  const maps=[
+    {w:{x:0,y:-1},s:{x:0,y:1},a:{x:-1,y:0},d:{x:1,y:0}},
+    {ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0}}
+  ];
+  const d0=maps[0][e.key];
+  if(d0&&!sn0.dead&&!(d0.x===-sn0.dir.x&&d0.y===-sn0.dir.y)){sn0.nextDir=d0;e.preventDefault();}
+  const d1=maps[1][e.key];
+  if(d1&&!sn1.dead&&!(d1.x===-sn1.dir.x&&d1.y===-sn1.dir.y)){sn1.nextDir=d1;e.preventDefault();}
+});
+
+canvas.addEventListener('click',e=>{
+  if(!alive) return;
+  const rect=canvas.getBoundingClientRect();
+  const sx=W/rect.width,sy=H/rect.height;
+  const mx=(e.clientX-rect.left)*sx;
+  const my=(e.clientY-rect.top)*sy;
+  const gx=Math.floor(mx/CELL),gy=Math.floor(my/CELL);
+  const ap=apples.find(a=>a.x===gx&&a.y===gy);
+  if(ap){
+    explode(ap,true);
+    setTimeout(()=>{ if(alive) spawnApple(); },600);
+  }
+});
+
+btn.addEventListener('click',()=>{
+  init();
+  ovWinner.style.display='none';
+  overlay.style.display='none';
+  cancelAnimationFrame(raf);
+  lastTick=0;
+  raf=requestAnimationFrame(loop);
+});
+</script>
+</body>
+</html>
